@@ -6,6 +6,7 @@
 //! actor pede, este pipeline executa fora dele.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -88,6 +89,10 @@ struct Inner {
     capture: Capture,
     cues: RwLock<Option<Arc<Cues>>>,
     asr: Arc<ModelSlot<WhisperEngine>>,
+    /// Cargas do ASR pedidas e ainda não terminadas. Conta desde o pedido
+    /// (síncrono), não desde o início da carga numa thread: sem isso o
+    /// status dizia "pronto" no começo do daemon, antes do aquecimento.
+    asr_requested: Arc<AtomicUsize>,
     polisher: Polisher,
     /// Perfil em vigor: vale a partir do próximo `start`.
     profile: Mutex<ProfileSettings>,
@@ -111,6 +116,7 @@ impl DictationPipeline {
             capture,
             cues: RwLock::new(cues),
             asr: Arc::new(ModelSlot::new()),
+            asr_requested: Arc::new(AtomicUsize::new(0)),
             polisher,
             profile: Mutex::new(ProfileSettings::default()),
             session: Mutex::new(None),
@@ -120,6 +126,36 @@ impl DictationPipeline {
 
     pub fn sources(&self) -> Result<Vec<SourceInfo>, CaptureError> {
         self.inner.capture.sources()
+    }
+}
+
+/// Sob demanda, descarregado conta como pronto (carrega no press), desde
+/// que o arquivo do modelo exista e nenhuma carga esteja pedida: com carga
+/// pedida (aquecimento do início, press), o status já é "carregando".
+fn readiness_of(state: ModelState, load_requested: bool, model_present: bool) -> Readiness {
+    match state {
+        ModelState::Loading => Readiness::Loading,
+        ModelState::Failed => Readiness::Failed,
+        ModelState::Unloaded if !model_present => Readiness::Failed,
+        ModelState::Unloaded if load_requested => Readiness::Loading,
+        _ => Readiness::Ready,
+    }
+}
+
+/// Uma carga do ASR pedida; solta o contador ao terminar ou ao ser
+/// descartada (future abandonado no desligamento).
+struct LoadRequest(Arc<AtomicUsize>);
+
+impl LoadRequest {
+    fn new(counter: &Arc<AtomicUsize>) -> Self {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Self(Arc::clone(counter))
+    }
+}
+
+impl Drop for LoadRequest {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -208,15 +244,12 @@ impl Inner {
         }
     }
 
-    /// Sob demanda, descarregado conta como pronto (carrega no press), desde
-    /// que o arquivo do modelo exista.
     fn readiness(&self) -> Readiness {
-        match self.asr.state() {
-            ModelState::Loading => Readiness::Loading,
-            ModelState::Failed => Readiness::Failed,
-            ModelState::Unloaded if !self.config().model.is_file() => Readiness::Failed,
-            _ => Readiness::Ready,
-        }
+        readiness_of(
+            self.asr.state(),
+            self.asr_requested.load(Ordering::SeqCst) > 0,
+            self.config().model.is_file(),
+        )
     }
 
     fn start(&self, ticket: Ticket) -> Result<(), Failure> {
@@ -441,11 +474,16 @@ impl Pipeline for DictationPipeline {
 
     fn load(&self, op: ModelOp, models: Models) -> impl Future<Output = ()> + Send + 'static {
         let inner = Arc::clone(&self.inner);
+        // Já no pedido, antes do future rodar: o próximo status diz "carregando".
+        let request = models
+            .asr
+            .then(|| LoadRequest::new(&self.inner.asr_requested));
         async move {
             let asr = async {
-                if models.asr {
+                if let Some(request) = request {
                     let slot = Arc::clone(&inner);
                     let _ = tokio::task::spawn_blocking(move || slot.load_asr(op)).await;
+                    drop(request);
                 }
             };
             let llm = async {
@@ -496,5 +534,48 @@ impl Pipeline for DictationPipeline {
             llm: inner.polisher.llm_state(),
             vram_bytes: Some(vram),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_requested_load_reports_loading_before_it_starts() {
+        // Antes: descarregado + modelo presente era "pronto" mesmo com o
+        // aquecimento do início já pedido (ready → loading → ready).
+        assert_eq!(
+            readiness_of(ModelState::Unloaded, true, true),
+            Readiness::Loading
+        );
+        assert_eq!(
+            readiness_of(ModelState::Unloaded, false, true),
+            Readiness::Ready
+        );
+        assert_eq!(
+            readiness_of(ModelState::Unloaded, true, false),
+            Readiness::Failed
+        );
+        assert_eq!(
+            readiness_of(ModelState::Loaded, true, true),
+            Readiness::Ready
+        );
+        assert_eq!(
+            readiness_of(ModelState::Loading, false, true),
+            Readiness::Loading
+        );
+    }
+
+    #[test]
+    fn load_request_counts_until_dropped() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let first = LoadRequest::new(&counter);
+        let second = LoadRequest::new(&counter);
+        assert_eq!(counter.load(Ordering::SeqCst), 2);
+        drop(first);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+        drop(second);
+        assert_eq!(counter.load(Ordering::SeqCst), 0);
     }
 }

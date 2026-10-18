@@ -729,7 +729,7 @@
   "{0} não confere: sha256 {1}, esperado {2}": "{0} não confere: sha256 {1}, esperado {2}",
   "{0} não está instalado; rode `fastwisper models pull {1}`": "{0} não está instalado; rode `fastwisper models pull {1}`",
   "{0} tem {1} bytes, esperado {2}; rode `fastwisper models pull {3}`": "{0} tem {1} bytes, esperado {2}; rode `fastwisper models pull {3}`",
-  "áudio      {0} s · rms {1} · idioma {2}{3}": "áudio      {0} s · rms {1} · idioma {2}{3}",
+  "áudio      {0} s · rms {1} · idioma {2}": "áudio      {0} s · rms {1} · idioma {2}",
   "áudio de {0} ms é mais curto que o mínimo de {1} ms": "áudio de {0} ms é mais curto que o mínimo de {1} ms",
   "último texto expirou": "último texto expirou",
   "últimos {0} dias · {1}": "últimos {0} dias · {1}",

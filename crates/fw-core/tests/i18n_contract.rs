@@ -420,3 +420,61 @@ fn no_portuguese_user_text_outside_the_catalogs() {
         problems.join("\n")
     );
 }
+
+/// Dois placeholders colados (`{2}{3}`) não têm delimitador: o molde nunca
+/// casa e a frase sai sem tradução. Cada chave separa os parâmetros com texto.
+/// `{n}{m}` com quaisquer índices, como `{2}{3}`, `{1}{0}` ou `{9}{10}`.
+fn has_adjacent_placeholders(template: &str) -> bool {
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        rest = &rest[start + 1..];
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0 && rest[digits..].starts_with("}{") {
+            let next = &rest[digits + 2..];
+            let more = next.bytes().take_while(u8::is_ascii_digit).count();
+            if more > 0 && next[more..].starts_with('}') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn adjacent_placeholder_detector_catches_any_indices() {
+    for template in ["a {2}{3}", "{1}{0} b", "x {9}{10}"] {
+        assert!(has_adjacent_placeholders(template), "{template}");
+    }
+    for template in ["a {0} {1}", "{0}, {1}", "{x}{y}", "{0}"] {
+        assert!(!has_adjacent_placeholders(template), "{template}");
+    }
+}
+
+#[test]
+fn catalog_templates_never_have_adjacent_placeholders() {
+    for source in [
+        include_str!("../src/i18n/en.json"),
+        include_str!("../src/i18n/pt-BR.json"),
+    ] {
+        let catalog: BTreeMap<String, String> = serde_json::from_str(source).expect("catálogo");
+        let adjacent: Vec<_> = catalog
+            .keys()
+            .filter(|key| has_adjacent_placeholders(key))
+            .collect();
+        assert!(adjacent.is_empty(), "placeholders colados: {adjacent:?}");
+    }
+}
+
+#[test]
+fn asr_lines_with_a_language_probability_are_translated() {
+    use fw_core::config::UiLanguage::En;
+    use fw_core::i18n::translate;
+    assert_eq!(
+        translate("áudio      11.00 s · rms 0.1421 · idioma en (0.95)", En),
+        "audio      11.00 s · rms 0.1421 · language en (0.95)"
+    );
+    assert_eq!(
+        translate("idioma=pt (0.99) · asr 752 ms · backend cpu", En),
+        "language=pt (0.99) · asr 752 ms · backend cpu"
+    );
+}

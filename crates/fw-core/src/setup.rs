@@ -2,7 +2,7 @@
 //! modelo) e grava `~/.config/fastwisper/config.toml` preservando comentários
 //! e ajustes do usuário. Uma escolha manual (futuro hub) só troca os valores.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use thiserror::Error;
 use toml_edit::{DocumentMut, Item, Value};
@@ -93,16 +93,7 @@ pub fn model_for(
 
 /// Caminho do modelo como vai para a config (`~/...` quando dá).
 pub fn model_config_path(spec: &ModelSpec) -> String {
-    let path = models::models_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.local/share/fastwisper/models"))
-        .join(spec.file_name);
-    match (std::env::var_os("HOME"), path.to_str()) {
-        (Some(home), Some(p)) => match Path::new(p).strip_prefix(&home) {
-            Ok(rest) => format!("~/{}", rest.display()),
-            Err(_) => p.to_owned(),
-        },
-        _ => path.display().to_string(),
-    }
+    models::config_path(spec)
 }
 
 /// O que o setup decidiu gravar.
