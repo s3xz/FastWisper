@@ -92,6 +92,15 @@ fn load(args: &CommonAsrArgs) -> anyhow::Result<Loaded> {
     })
 }
 
+/// Idioma com a probabilidade, num só parâmetro: dois placeholders colados
+/// no catálogo não casam e a linha sairia sem tradução.
+fn language_label(language: Language, probability: Option<f32>) -> String {
+    match probability {
+        Some(p) => format!("{language} ({p:.2})"),
+        None => language.to_string(),
+    }
+}
+
 fn choice(lang: LangArg) -> LanguageChoice {
     match lang {
         LangArg::Auto => LanguageChoice::Auto,
@@ -100,9 +109,25 @@ fn choice(lang: LangArg) -> LanguageChoice {
     }
 }
 
+/// `--lang pt|en` sobre áudio claramente de outro idioma sairia traduzido;
+/// recusa em vez de entregar a tradução. `auto` já escolhe pelo áudio.
+fn refuse_translation(loaded: &mut Loaded, common: &CommonAsrArgs) -> anyhow::Result<()> {
+    if let LanguageChoice::Fixed(forced) = choice(common.lang) {
+        let detected = loaded.engine.detect_language(&TranscribeRequest {
+            audio: &loaded.pcm,
+            language: choice(common.lang),
+            allowed: &loaded.allowed,
+            prompt: common.prompt.as_deref(),
+        })?;
+        fw_core::asr::check_forced_language(forced, detected)?;
+    }
+    Ok(())
+}
+
 pub fn transcribe(args: TranscribeArgs) -> anyhow::Result<()> {
     let common = &args.common;
     let mut loaded = load(common)?;
+    refuse_translation(&mut loaded, common)?;
     let transcript = loaded.engine.transcribe(TranscribeRequest {
         audio: &loaded.pcm,
         language: choice(common.lang),
@@ -121,12 +146,8 @@ pub fn transcribe(args: TranscribeArgs) -> anyhow::Result<()> {
     } else {
         crate::outln!("{}", transcript.text);
         crate::human_error!(
-            "idioma={}{} · asr {} ms · backend {}",
-            transcript.language,
-            transcript
-                .language_probability
-                .map(|p| format!(" ({p:.2})"))
-                .unwrap_or_default(),
+            "idioma={} · asr {} ms · backend {}",
+            language_label(transcript.language, transcript.language_probability),
             transcript.elapsed.as_millis(),
             backend_label(loaded.engine.info()),
         );
@@ -156,6 +177,9 @@ pub fn bench(args: BenchArgs) -> anyhow::Result<()> {
         last = Some(transcript);
     }
     let last = last.context("nenhuma execução")?;
+    // Depois das execuções cronometradas: uma passada de detecção antes
+    // aqueceria o motor e a medida "fria" sairia baixa demais.
+    refuse_translation(&mut loaded, common)?;
 
     let model_size = std::fs::metadata(&loaded.model)
         .map(|m| m.len())
@@ -185,12 +209,9 @@ pub fn bench(args: BenchArgs) -> anyhow::Result<()> {
     }
     crate::human_print!("carga      {} ms", info.load_time.as_millis());
     crate::human_print!(
-        "áudio      {audio_secs:.2} s · rms {:.4} · idioma {}{}",
+        "áudio      {audio_secs:.2} s · rms {:.4} · idioma {}",
         loaded.pcm.rms(),
-        last.language,
-        last.language_probability
-            .map(|p| format!(" ({p:.2})"))
-            .unwrap_or_default()
+        language_label(last.language, last.language_probability)
     );
     crate::human_print!("palavras   {}", last.word_count());
 

@@ -96,15 +96,12 @@ pub fn run(args: SetupArgs) -> anyhow::Result<()> {
         },
     )?;
 
-    crate::human_print!(
-        "config     {}{}",
-        path.display(),
-        if existing.is_some() {
-            String::new()
-        } else {
-            crate::human(" (nova)")
-        }
-    );
+    let config_label = if existing.is_some() {
+        path.display().to_string()
+    } else {
+        format!("{}{}", path.display(), crate::human(" (nova)"))
+    };
+    crate::human_print!("config     {config_label}");
     crate::human_print!("microfone  {mic}  [{device}]");
     crate::human_print!("gpu        {gpu}  (asr.gpu = \"{gpu_setting}\")");
     crate::human_print!("modelo     {model}");

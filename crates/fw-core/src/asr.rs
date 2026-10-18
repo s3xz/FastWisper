@@ -111,6 +111,14 @@ pub enum AsrError {
     NoAllowedLanguages,
     #[error("falha na inferência do ASR: {0}")]
     Inference(String),
+    #[error(
+        "o áudio parece estar em {detected} ({probability:.2}), não em {forced}; o FastWisper não traduz: use --lang auto ou --lang {detected}"
+    )]
+    LanguageMismatch {
+        forced: Language,
+        detected: Language,
+        probability: f32,
+    },
 }
 
 /// Escolha da GPU por `asr.gpu`, sobre os nomes na ordem do ggml (que lista
@@ -218,6 +226,25 @@ pub fn check_request(request: &TranscribeRequest<'_>, min_audio: Duration) -> Re
         && !request.allowed.contains(&lang)
     {
         return Err(AsrError::NoAllowedLanguages);
+    }
+    Ok(())
+}
+
+/// A partir desta probabilidade, a detecção conta como "claramente outro
+/// idioma" para [`check_forced_language`].
+pub const FORCED_LANGUAGE_MISMATCH: f32 = 0.5;
+
+/// Idioma fixado (`--lang`) contra o detectado: o Whisper com o idioma
+/// errado no decodificador traduz em vez de transcrever. Áudio claramente
+/// de outro idioma é recusado; detecção incerta deixa o idioma fixado valer.
+pub fn check_forced_language(forced: Language, detected: (Language, f32)) -> Result<(), AsrError> {
+    let (language, probability) = detected;
+    if language != forced && probability >= FORCED_LANGUAGE_MISMATCH {
+        return Err(AsrError::LanguageMismatch {
+            forced,
+            detected: language,
+            probability,
+        });
     }
     Ok(())
 }
@@ -346,6 +373,17 @@ pub mod whisper {
 
         pub fn info(&self) -> &BackendInfo {
             &self.info
+        }
+
+        /// Idioma mais provável entre todos os suportados, sem transcrever.
+        /// Valida o pedido antes, como `transcribe`: áudio curto demais sai
+        /// como `AudioTooShort`, não como divergência de idioma.
+        pub fn detect_language(
+            &mut self,
+            request: &TranscribeRequest<'_>,
+        ) -> Result<(Language, f32), AsrError> {
+            check_request(request, self.min_audio)?;
+            self.detect(request.audio.samples(), &Language::ALL)
         }
 
         fn detect(

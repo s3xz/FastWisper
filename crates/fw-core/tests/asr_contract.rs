@@ -122,6 +122,24 @@ fn named_gpu_is_strict() {
     ));
 }
 
+/// `--lang` fixa o idioma do decodificador; se o áudio é claramente de outro
+/// idioma, o Whisper traduziria. A checagem recusa em vez de traduzir.
+#[test]
+fn forced_language_refuses_audio_clearly_in_another_language() {
+    use fw_core::asr::check_forced_language;
+    assert!(matches!(
+        check_forced_language(Language::Pt, (Language::En, 0.95)),
+        Err(AsrError::LanguageMismatch {
+            forced: Language::Pt,
+            detected: Language::En,
+            ..
+        })
+    ));
+    assert!(check_forced_language(Language::Pt, (Language::Pt, 0.99)).is_ok());
+    // Detecção incerta não bloqueia: quem fixou o idioma decide.
+    assert!(check_forced_language(Language::Pt, (Language::En, 0.4)).is_ok());
+}
+
 #[cfg(feature = "whisper")]
 mod real_model {
     use std::path::{Path, PathBuf};
@@ -133,7 +151,7 @@ mod real_model {
     use fw_core::audio::{self, Pcm16k};
     use fw_core::config::AsrConfig;
 
-    use super::{BOTH, MIN, request};
+    use super::{BOTH, MIN, pcm, request};
 
     fn model() -> PathBuf {
         std::env::var_os("FASTWISPER_TEST_MODEL")
@@ -225,6 +243,39 @@ mod real_model {
             assert!(text.contains(word), "faltou \"{word}\": {}", t.text);
         }
         assert!(!text.contains("dress"), "não traduz: {}", t.text);
+    }
+
+    #[test]
+    #[ignore = "precisa do modelo real"]
+    fn a_too_short_clip_is_reported_as_short_not_as_another_language() {
+        let short = pcm(0.2);
+        let forced = LanguageChoice::Fixed(Language::Pt);
+        let err = engine()
+            .detect_language(&request(&short, forced, BOTH))
+            .expect_err("curto demais");
+        assert!(matches!(err, AsrError::AudioTooShort { .. }), "{err:?}");
+    }
+
+    #[test]
+    #[ignore = "precisa do modelo real"]
+    fn forcing_the_wrong_language_is_caught_before_transcribing() {
+        let mut engine = engine();
+        let en = fixture("en-jfk.wav");
+        let forced = LanguageChoice::Fixed(Language::Pt);
+        let (language, p) = engine
+            .detect_language(&request(&en, forced, BOTH))
+            .expect("detecção");
+        assert_eq!(language, Language::En);
+        assert!(
+            fw_core::asr::check_forced_language(Language::Pt, (language, p)).is_err(),
+            "p = {p}"
+        );
+        let pt = fixture("pt-casa-velha.wav");
+        let (language, p) = engine
+            .detect_language(&request(&pt, forced, BOTH))
+            .expect("detecção");
+        assert_eq!(language, Language::Pt);
+        assert!(fw_core::asr::check_forced_language(Language::Pt, (language, p)).is_ok());
     }
 
     #[test]

@@ -294,7 +294,7 @@
   "{0} não confere: sha256 {1}, esperado {2}": "{0} failed verification: sha256 {1}, expected {2}",
   "{0} não está instalado; rode `fastwisper models pull {1}`": "{0} is not installed; run `fastwisper models pull {1}`",
   "{0} tem {1} bytes, esperado {2}; rode `fastwisper models pull {3}`": "{0} has {1} bytes, expected {2}; run `fastwisper models pull {3}`",
-  "áudio      {0} s · rms {1} · idioma {2}{3}": "audio      {0} s · rms {1} · language {2}{3}",
+  "áudio      {0} s · rms {1} · idioma {2}": "audio      {0} s · rms {1} · language {2}",
   "áudio de {0} ms é mais curto que o mínimo de {1} ms": "{0} ms of audio is shorter than the minimum of {1} ms",
   "último texto expirou": "last text expired",
   "últimos {0} dias · {1}": "last {0} days · {1}",
@@ -965,7 +965,7 @@
   "{0} (llm.ollama_cloud: {1})": "{0} (llm.ollama_cloud: {1})",
   "Inicie com `systemctl --user start fastwisperd` ou `fastwisperd`.": "Start with `systemctl --user start fastwisperd` or `fastwisperd`.",
   "fria       {0} ms · RTF {1}": "cold       {0} ms · RTF {1}",
-  "idioma={0}{1} · asr {2} ms · backend {3}": "language={0}{1} · asr {2} ms · backend {3}",
+  "idioma={0} · asr {1} ms · backend {2}": "language={0} · asr {1} ms · backend {2}",
   "fora do manifesto": "outside the manifest",
   "{0} sha256:{1}\nlicença: Apache-2.0\norigem observada: {2}/manifests/4b-instruct\n{3}": "{0} sha256:{1}\nlicense: Apache-2.0\nobserved origin: {2}/manifests/4b-instruct\n{3}",
   "ok: {0} digest {1} em {2}. Ferramenta opcional: para servir este store, aponte OLLAMA_MODELS de um Ollama para ele; o FastWisper não altera serviços.": "ok: {0} digest {1} at {2}. Optional tool: to serve this store, point an Ollama instance's OLLAMA_MODELS at it; FastWisper does not change services.",
@@ -975,7 +975,7 @@
   "backend    {0}": "backend    {0}",
   "baixando {0} ({1} MB, {2}) de {3}": "downloading {0} ({1} MB, {2}) from {3}",
   "--dry-run: nada foi gravado": "--dry-run: nothing was saved",
-  "config     {0}{1}": "config     {0}{1}",
+  "config     {0}": "config     {0}",
   "rede liberada para o provider remoto ({0}): {1}": "network access enabled for the remote provider ({0}): {1}",
   "config gravada": "config saved",
   "audio.device = \"{0}\" → {1}": "audio.device = \"{0}\" → {1}",
@@ -1047,5 +1047,6 @@
   "sem resposta da thread de captura": "no response from the capture thread",
   "dispositivo sumiu ao iniciar": "device disappeared while starting",
   "pod de formato inválido": "invalid format pod",
-  "erro": "error"
+  "erro": "error",
+  "o áudio parece estar em {0} ({1}), não em {2}; o FastWisper não traduz: use --lang auto ou --lang {3}": "the audio seems to be in {0} ({1}), not in {2}; FastWisper does not translate: use --lang auto or --lang {3}"
 }

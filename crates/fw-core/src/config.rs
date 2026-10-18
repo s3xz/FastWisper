@@ -277,7 +277,13 @@ pub struct AsrConfig {
 impl Default for AsrConfig {
     fn default() -> Self {
         Self {
-            model: "~/.local/share/fastwisper/models/ggml-large-v3-turbo-q5_0.bin".into(),
+            // Onde `models pull` grava (segue `XDG_DATA_HOME`); sem ele,
+            // `~/.local/share/fastwisper/models/...`.
+            model: crate::models::find(crate::models::DEFAULT_MODEL_ID)
+                .map(crate::models::config_path)
+                .unwrap_or_else(|| {
+                    "~/.local/share/fastwisper/models/ggml-large-v3-turbo-q5_0.bin".into()
+                }),
             languages: vec![Language::Pt, Language::En],
             threads: 8,
             gpu: "auto".into(),
@@ -735,7 +741,29 @@ mod tests {
         let config = parse(text).expect("config de exemplo precisa ser válida");
         assert_eq!(config.hotkey, HotkeyConfig::default());
         assert_eq!(config.audio, AudioConfig::default());
-        assert_eq!(config.asr, AsrConfig::default());
+        // O caminho padrão do modelo segue XDG_DATA_HOME; o exemplo documenta
+        // o local padrão. Compara o resto e o nome do arquivo à parte, para o
+        // teste não depender do ambiente de quem roda.
+        let default_asr = AsrConfig::default();
+        assert_eq!(
+            config.asr,
+            AsrConfig {
+                model: config.asr.model.clone(),
+                ..default_asr.clone()
+            }
+        );
+        let file = crate::models::find(crate::models::DEFAULT_MODEL_ID)
+            .expect("modelo padrão no manifesto")
+            .file_name;
+        assert_eq!(
+            config.asr.model,
+            format!("~/.local/share/fastwisper/models/{file}")
+        );
+        assert!(
+            default_asr
+                .model
+                .ends_with(&format!("/fastwisper/models/{file}"))
+        );
         assert_eq!(config.llm, LlmConfig::default());
         assert_eq!(config.inject, InjectConfig::default());
         assert_eq!(config.privacy, PrivacyConfig::default());

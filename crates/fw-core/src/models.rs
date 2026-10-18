@@ -165,6 +165,21 @@ pub fn models_dir() -> Option<PathBuf> {
     Some(base.join("fastwisper").join("models"))
 }
 
+/// Caminho de um modelo do manifesto como vai para a config: dentro de
+/// [`models_dir`] (onde `models pull` grava), com `~/` quando fica no HOME.
+pub fn config_path(spec: &ModelSpec) -> String {
+    let path = models_dir()
+        .unwrap_or_else(|| PathBuf::from("~/.local/share/fastwisper/models"))
+        .join(spec.file_name);
+    match (env::var_os("HOME"), path.to_str()) {
+        (Some(home), Some(p)) => match Path::new(p).strip_prefix(&home) {
+            Ok(rest) => format!("~/{}", rest.display()),
+            Err(_) => p.to_owned(),
+        },
+        _ => path.display().to_string(),
+    }
+}
+
 /// Expande `~/` no início de um caminho da config.
 pub fn expand_home(path: &str) -> PathBuf {
     match (path.strip_prefix("~/"), env::var_os("HOME")) {
