@@ -13,20 +13,20 @@
   "dependencies": {
     "@fontsource/figtree": "^5",
     "@fontsource/jetbrains-mono": "^5",
-    "@lucide/svelte": "^0.479.0",
-    "@tauri-apps/api": "~2.11.0"
+    "@lucide/svelte": "^1.59.0",
+    "@tauri-apps/api": "~2.12.4"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3",
-    "@sveltejs/kit": "^2",
-    "@sveltejs/vite-plugin-svelte": "^6",
+    "@sveltejs/adapter-static": "^4",
+    "@sveltejs/kit": "^3",
+    "@sveltejs/vite-plugin-svelte": "^7",
     "@tailwindcss/vite": "^4",
     "@tauri-apps/cli": "^2",
     "svelte": "^5",
     "svelte-check": "^4",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vite": "^7"
+    "typescript": "^7",
+    "vite": "^8"
   },
   "allowScripts": {
     "esbuild@0.28.2": true
