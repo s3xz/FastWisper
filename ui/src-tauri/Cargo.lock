@@ -1124,7 +1124,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "tokio",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]
@@ -1317,7 +1317,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "toml 0.9.12+spec-1.1.0",
+ "toml 1.1.8+spec-1.1.0",
  "toml_edit 0.25.17+spec-1.1.0",
  "tracing",
  "ureq",
@@ -4362,9 +4362,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.53.2"
+version = "1.53.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
 dependencies = [
  "bytes",
  "libc",
